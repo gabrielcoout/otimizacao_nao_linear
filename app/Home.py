@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from src.Dados import get_dados, get_metricas, obter_ibxl, obter_selic_atual
 from src.Visualizacoes import graficoAcoes, graficoRetorno, graficoVolatilidade, graficoRAcumulado, plot_correlacao
 from src.BarreiraLogaritmicaPenalizacaoQuadratica import BarreiraLogaritmicaPenalizacaoQuadratica
+from src.Analitico import Analitico
+from src.GradienteAscendenteProjetado import GradienteAscendenteProjetado
+from src.PartialSpectralProjectedGradient import ProjectedSpectralProjectedGradient
 
 
 
@@ -20,15 +23,12 @@ def pipeline_dados(ibv_path, meta_path):
 
 ibv_50 = pipeline_dados(CSV_PATH, META_PATH)
 
-# metricas = get_metricas(dados)
-# covariancia = metricas['covariancia']
-# retorno_medio = metricas['retorno_medio']
-# n_ativos = len(retorno_medio)
-
-
 metodos = {
-    "BarreiraLogaritmicaPenalizacaoQuadratica": BarreiraLogaritmicaPenalizacaoQuadratica,
-    "GradienteAscendente": "GradienteAscendente"}
+    "Barreira Logaritmica Penalizacao Quadratica": BarreiraLogaritmicaPenalizacaoQuadratica,
+    "Projected Spectral Projected Gradient": ProjectedSpectralProjectedGradient,
+    "Gradiente Ascendente": GradienteAscendenteProjetado,
+    "Analitico": Analitico
+}
 
 def Home():
     st.set_page_config(
@@ -70,23 +70,6 @@ def Home():
         st.markdown("---")
 
         if submit_button:
-            pass
-            # col1, col2= st.columns(2)
-            # with col1:
-            #     ax = graficoAcoes(dados)
-            #     st.pyplot(ax.get_figure())
-            # with col2:
-            #     ax2 = graficoVolatilidade(info_ativos)
-            #     st.pyplot(ax2.get_figure())
-                
-                
-            # col3,col4 = st.columns(2)
-            # with col3:
-            #     ax3 = graficoRAcumulado(info_ativos)
-            #     st.pyplot(ax3.get_figure())
-            # with col4:
-            #     ax4 = graficoRetorno(info_ativos)
-                # st.pyplot(ax4.get_figure())
             
             with st.container(border = True):
                 metricas = get_metricas(dados)
@@ -100,118 +83,132 @@ def Home():
                 otimizador = metodos[metodo_escolhido](mu, cov, r_f)
 
                 solucao = otimizador.fit()
-                pesos = solucao['w']
-                retorno = mu @ pesos 
-                risco = np.sqrt(pesos.T @ cov @ pesos)
-                sharpe = solucao['sharpe']
+                if solucao['success'] == True or not metodo_escolhido == 'Analitico':
+                    pesos = solucao['w']
+                    retorno = mu @ pesos 
+                    risco = np.sqrt(pesos.T @ cov @ pesos)
+                    sharpe = solucao['sharpe']
 
-                st.write(f"Método de minimização do risco ({metodo_escolhido} - {solucao['method']}):")
+                    st.markdown(f"### {metodo_escolhido} - {solucao['method']}:")
 
-                investimento = pesos*capital
-                dict_pesos = {'Ativos': selecionadas, 'Pesos': pesos, 'Investimento (R$)': investimento}
-                col1,col2 = st.columns(2)
-                col2.metric(label = "Ganho",
-                            value = f'{retorno*capital:.2f} R$',
-                            border = True)
-                col1.metric(label = 'Montante final',
-                            value = f'{capital*(1+retorno):.2f} R$',
-                            border = True)
-            
+                    investimento = pesos*capital
+                    dict_pesos = {'Ativos': selecionadas, 'Pesos': pesos, 'Investimento (R$)': investimento}
+                    col1,col2 = st.columns(2)
+                    col2.metric(label = "Ganho",
+                                value = f'{retorno*capital:.2f} R$',
+                                border = True)
+                    col1.metric(label = 'Montante final',
+                                value = f'{capital*(1+retorno):.2f} R$',
+                                border = True)
+                
 
-                col1,col2,col3 = st.columns(3)
-                col1.metric(label = "Retorno Anualizado",
-                            value = f'{retorno:.3f}',
-                            border = True)
-                col2.metric(label = 'Risco',
-                            value = f'{risco:.3f}',
-                            border = True)
-                col3.metric(label = "Índice Sharpe Anualizado",
-                            value = f'{sharpe:.3f}',
-                            border = True)
-                st.dataframe(dict_pesos)
-                st.write("Distribuição de pesos:")
-                st.bar_chart(data=dict_pesos, x='Ativos', y='Pesos')
+                    col1,col2,col3 = st.columns(3)
+                    col1.metric(label = "Retorno Anualizado",
+                                value = f'{retorno:.3f}',
+                                border = True)
+                    col2.metric(label = 'Risco',
+                                value = f'{risco:.3f}',
+                                border = True)
+                    col3.metric(label = "Índice Sharpe Anualizado",
+                                value = f'{sharpe:.3f}',
+                                border = True)
+                    st.dataframe(dict_pesos)
+                    st.write("Distribuição de pesos:")
+                    st.bar_chart(data=dict_pesos, x='Ativos', y='Pesos')
 
-            if mu.size == 3:
-                with st.container(border=True):
-                    st.write("Otimização de portfólio de investimento com base nos ativos selecionados:")
-                    col1, col2, col3 = st.columns([1,2,1])  # coluna central maior
-                    with col2:
+                    if mu.size == 3:
+                        with st.container(border=True):
+                            st.markdown("### Otimização de portfólio de investimento com base nos ativos" + f" {selecionadas[0]}, {selecionadas[1]}, {selecionadas[2]}:")
+                            col1, col2, col3 = st.columns([1,2,1])  # coluna central maior
+                            with col2:
 
-                        def sharpe_ratio(mu, cov, r_f):
-                            def f(w):
-                                Rw = w @ mu
-                                var = w @ cov @ w
-                                return (Rw - r_f) / np.sqrt(var)
-                            return f
+                                def sharpe_ratio(mu, cov, r_f):
+                                    def f(w):
+                                        Rw = w @ mu
+                                        var = w @ cov @ w
+                                        return (Rw - r_f) / np.sqrt(var)
+                                    return f
 
-                        f = sharpe_ratio(mu, cov, r_f)
+                                f = sharpe_ratio(mu, cov, r_f)
 
-                        N = 200  # menos pontos para acelerar
-                        w1 = np.linspace(0, 1, N)
-                        w2 = np.linspace(0, 1, N)
-                        W1, W2 = np.meshgrid(w1, w2)
-                        W3 = 1 - W1 - W2
+                                N = 200  # menos pontos para acelerar
+                                w1 = np.linspace(0, 1, N)
+                                w2 = np.linspace(0, 1, N)
+                                W1, W2 = np.meshgrid(w1, w2)
+                                W3 = 1 - W1 - W2
 
-                        mask = (W1 >= 0) & (W2 >= 0) & (W3 >= 0)
-                        Sharpe = np.full_like(W1, np.nan)
+                                mask = (W1 >= 0) & (W2 >= 0) & (W3 >= 0)
+                                Sharpe = np.full_like(W1, np.nan)
 
-                        for i in range(N):
-                            for j in range(N):
-                                if mask[i, j]:
-                                    Sharpe[i, j] = f([W1[i, j], W2[i, j], W3[i, j]])
+                                for i in range(N):
+                                    for j in range(N):
+                                        if mask[i, j]:
+                                            Sharpe[i, j] = f([W1[i, j], W2[i, j], W3[i, j]])
 
-                        # figura menor
-                        fig, ax = plt.subplots(figsize=(3, 3))
-                        c = ax.contourf(W1, W2, Sharpe, levels=20, cmap='plasma')
-                        fig.colorbar(c, ax=ax, shrink=0.8)
+                                # figura menor
+                                fig, ax = plt.subplots(figsize=(3, 3))
+                                c = ax.contourf(W1, W2, Sharpe, levels=20, cmap='plasma')
+                                fig.colorbar(c, ax=ax, shrink=0.8)
 
-                        contours = ax.contour(W1, W2, Sharpe, levels=10, colors='black', alpha=0.6, linewidths=0.5)
-                        ax.clabel(contours, inline=True, fontsize=7, fmt="%.2f")
+                                contours = ax.contour(W1, W2, Sharpe, levels=10, colors='black', alpha=0.6, linewidths=0.5)
+                                ax.clabel(contours, inline=True, fontsize=7, fmt="%.2f")
 
-                        ax.set_xlabel(selecionadas[0], fontsize=10)
-                        ax.set_ylabel(selecionadas[1], fontsize=10)
-                        ax.set_title("Sharpe — Portfólio 3 Ativos", fontsize=10)
-                        ax.plot([0, 1], [1, 0], color='black', linewidth=0.7, alpha=0.7)
-                        ax.set_xticks([0,1])
-                        ax.set_yticks([1])
-                        ax.spines['top'].set_visible(False)
-                        ax.spines['right'].set_visible(False)
-
-
-                        # percorre pares consecutivos da trajetória
-                        for index in range(1, len(solucao['history'])):
-                            p1 = solucao['history'][index-1]
-                            p2 = solucao['history'][index]
-
-                            # alpha decresce conforme o passo é mais antigo
-                            alpha = (1 - (index / len(solucao['history'])))*0.5
-
-                            # linha tracejada entre p1 e p2
-                            ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
-                                    linestyle="--", color="black", alpha=alpha, marker='*', linewidth=0.7, markersize=3)
-                            plt.tight_layout()               
-
-                        st.pyplot(fig, use_container_width=False)
+                                ax.set_xlabel(selecionadas[0], fontsize=10)
+                                ax.set_ylabel(selecionadas[1], fontsize=10)
+                                ax.set_title("Índice Sharpe", fontsize=10)
+                                ax.plot([0, 1], [1, 0], color='black', linewidth=0.7, alpha=0.7)
+                                ax.set_xticks([0,1])
+                                ax.set_yticks([1])
+                                ax.spines['top'].set_visible(False)
+                                ax.spines['right'].set_visible(False)
 
 
+                                # percorre pares consecutivos da trajetória
+                                for index in range(1, len(solucao['history'])):
+                                    p1 = solucao['history'][index-1]
+                                    p2 = solucao['history'][index]
 
-            with st.container(border=True):
-                st.markdown("""
-                ### Interpretação dos Níveis
+                                    # alpha decresce conforme o passo é mais antigo
+                                    alpha = (1 - (index / len(solucao['history'])))*0.5
 
-                #### **Retorno anualizado**
-                -  **Baixo**: menor que **5%**
-                -  **Médio**: entre **5% e 10%**
-                -  **Alto**: acima de **10%**
+                                    # linha tracejada entre p1 e p2
+                                    ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
+                                            linestyle="--", color="black", alpha=alpha, marker='*', linewidth=0.7, markersize=3)
+                                    plt.tight_layout()               
 
-                #### **Risco (volatilidade anualizada)**
-                -  **Baixo**: menor que **10%**
-                -  **Médio**: entre **10% e 20%**
-                -  **Alto**: acima de **20%**
+                                st.pyplot(fig, use_container_width=False)
+                    
 
-                #### **Índice de Sharpe**
-                -  **Ruim**: menor que **1**
-                -  **Aceitável**: entre **1 e 2**
-                -  **Excelente**: acima de **2**
-                """)
+                        with st.container(border=True):
+                            col1, col2 = st.columns(2)
+                            tempo = solucao['time']
+                            nit = solucao['nit_total']
+
+                            col2.metric(label="Tempo de execução",
+                                        value=f"{tempo:.2f} seg")   # ou R$, se for dinheiro
+
+                            col1.metric(label="Número de iterações",
+                                        value=f"{nit:.0f}")
+
+
+                    with st.container(border=True):
+                        st.markdown("""
+                        ### Interpretação das Métricas
+
+                        #### **Retorno anualizado**
+                        -  **Baixo**: menor que **5%**
+                        -  **Médio**: entre **5% e 10%**
+                        -  **Alto**: acima de **10%**
+
+                        #### **Risco (volatilidade anualizada)**
+                        -  **Baixo**: menor que **10%**
+                        -  **Médio**: entre **10% e 20%**
+                        -  **Alto**: acima de **20%**
+
+                        #### **Índice de Sharpe**
+                        -  **Ruim**: menor que **1**
+                        -  **Aceitável**: entre **1 e 2**
+                        -  **Excelente**: acima de **2**
+                        """)
+                else:
+                    st.warning("Nenhuma solução encontrada.")
