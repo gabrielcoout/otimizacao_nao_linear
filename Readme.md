@@ -22,9 +22,13 @@ O Streamlit abrirá automaticamente no navegador (por padrão em http://localhos
 # Estrutura
 
 main.py → ponto de entrada do dashboard
+
 Dados/ → funções para coleta e processamento de dados
+
 Otimizacao/ → métodos de otimização de portfólio
+
 Visualizacoes/ → gráficos e plots
+
 data/ → cache de dados e metadados
 
 # Objetivo
