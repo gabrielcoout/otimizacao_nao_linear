@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from PIL import Image
+import matplotlib.pyplot as plt
 
 from src.Dados import get_dados, get_metricas, obter_ibxl, obter_selic_atual
 from src.Visualizacoes import graficoAcoes, graficoRetorno, graficoVolatilidade, graficoRAcumulado, plot_correlacao
-from src.Otimizacao import BarreiraLogaritmicaPenalizacaoQuadratica
+from src.BarreiraLogaritmicaPenalizacaoQuadratica import BarreiraLogaritmicaPenalizacaoQuadratica
 
 
 
@@ -59,7 +59,7 @@ def Home():
             with col1:
                 r_f = st.number_input("Taxa livre de Risco", value=0.05, step=0.05, format="%.3f")
             with col2:
-                capital = st.number_input("Qual valor deseja investir? (Ex: 1000.00)", min_value = 0.0)
+                capital = st.number_input("Qual valor deseja investir? (Ex: 1000.00)", min_value = 0.0, value=1000.00)
             with col3:
                 metodo_escolhido = st.selectbox(
                     "Método de otimização:",
@@ -89,7 +89,6 @@ def Home():
                 # st.pyplot(ax4.get_figure())
             
             with st.container(border = True):
-                st.write("Método de minimização do risco:")
                 metricas = get_metricas(dados)
                 # r_f = obter_selic_atual()
                 cov = metricas['covariancia'].values
@@ -105,6 +104,8 @@ def Home():
                 retorno = mu @ pesos 
                 risco = np.sqrt(pesos.T @ cov @ pesos)
                 sharpe = solucao['sharpe']
+
+                st.write(f"Método de minimização do risco ({metodo_escolhido} - {solucao['method']}):")
 
                 investimento = pesos*capital
                 dict_pesos = {'Ativos': selecionadas, 'Pesos': pesos, 'Investimento (R$)': investimento}
@@ -130,3 +131,87 @@ def Home():
                 st.dataframe(dict_pesos)
                 st.write("Distribuição de pesos:")
                 st.bar_chart(data=dict_pesos, x='Ativos', y='Pesos')
+
+            if mu.size == 3:
+                with st.container(border=True):
+                    st.write("Otimização de portfólio de investimento com base nos ativos selecionados:")
+                    col1, col2, col3 = st.columns([1,2,1])  # coluna central maior
+                    with col2:
+
+                        def sharpe_ratio(mu, cov, r_f):
+                            def f(w):
+                                Rw = w @ mu
+                                var = w @ cov @ w
+                                return (Rw - r_f) / np.sqrt(var)
+                            return f
+
+                        f = sharpe_ratio(mu, cov, r_f)
+
+                        N = 200  # menos pontos para acelerar
+                        w1 = np.linspace(0, 1, N)
+                        w2 = np.linspace(0, 1, N)
+                        W1, W2 = np.meshgrid(w1, w2)
+                        W3 = 1 - W1 - W2
+
+                        mask = (W1 >= 0) & (W2 >= 0) & (W3 >= 0)
+                        Sharpe = np.full_like(W1, np.nan)
+
+                        for i in range(N):
+                            for j in range(N):
+                                if mask[i, j]:
+                                    Sharpe[i, j] = f([W1[i, j], W2[i, j], W3[i, j]])
+
+                        # figura menor
+                        fig, ax = plt.subplots(figsize=(3, 3))
+                        c = ax.contourf(W1, W2, Sharpe, levels=20, cmap='plasma')
+                        fig.colorbar(c, ax=ax, shrink=0.8)
+
+                        contours = ax.contour(W1, W2, Sharpe, levels=10, colors='black', alpha=0.6, linewidths=0.5)
+                        ax.clabel(contours, inline=True, fontsize=7, fmt="%.2f")
+
+                        ax.set_xlabel(selecionadas[0], fontsize=10)
+                        ax.set_ylabel(selecionadas[1], fontsize=10)
+                        ax.set_title("Sharpe — Portfólio 3 Ativos", fontsize=10)
+                        ax.plot([0, 1], [1, 0], color='black', linewidth=0.7, alpha=0.7)
+                        ax.set_xticks([0,1])
+                        ax.set_yticks([1])
+                        ax.spines['top'].set_visible(False)
+                        ax.spines['right'].set_visible(False)
+
+
+                        # percorre pares consecutivos da trajetória
+                        for index in range(1, len(solucao['history'])):
+                            p1 = solucao['history'][index-1]
+                            p2 = solucao['history'][index]
+
+                            # alpha decresce conforme o passo é mais antigo
+                            alpha = (1 - (index / len(solucao['history'])))*0.5
+
+                            # linha tracejada entre p1 e p2
+                            ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
+                                    linestyle="--", color="black", alpha=alpha, marker='*', linewidth=0.7, markersize=3)
+                            plt.tight_layout()               
+
+                        st.pyplot(fig, use_container_width=False)
+
+
+
+            with st.container(border=True):
+                st.markdown("""
+                ### Interpretação dos Níveis
+
+                #### **Retorno anualizado**
+                -  **Baixo**: menor que **5%**
+                -  **Médio**: entre **5% e 10%**
+                -  **Alto**: acima de **10%**
+
+                #### **Risco (volatilidade anualizada)**
+                -  **Baixo**: menor que **10%**
+                -  **Médio**: entre **10% e 20%**
+                -  **Alto**: acima de **20%**
+
+                #### **Índice de Sharpe**
+                -  **Ruim**: menor que **1**
+                -  **Aceitável**: entre **1 e 2**
+                -  **Excelente**: acima de **2**
+                """)
