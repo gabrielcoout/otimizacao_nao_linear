@@ -8,7 +8,7 @@ from src.Visualizacoes import graficoAcoes, graficoRetorno, graficoVolatilidade,
 from src.BarreiraLogaritmicaPenalizacaoQuadratica import BarreiraLogaritmicaPenalizacaoQuadratica
 from src.Analitico import Analitico
 from src.GradienteAscendenteProjetado import GradienteAscendenteProjetado
-from src.PartialSpectralProjectedGradient import ProjectedSpectralProjectedGradient
+from GradienteEspectralProjetado import GradienteEspectralProjetado
 
 
 
@@ -25,7 +25,7 @@ ibv_50 = pipeline_dados(CSV_PATH, META_PATH)
 
 metodos = {
     "Barreira Logaritmica Penalizacao Quadratica": BarreiraLogaritmicaPenalizacaoQuadratica,
-    "Projected Spectral Projected Gradient": ProjectedSpectralProjectedGradient,
+    "Gradiente Espectral Projetado": GradienteEspectralProjetado,
     "Gradiente Ascendente": GradienteAscendenteProjetado,
     "Analitico": Analitico
 }

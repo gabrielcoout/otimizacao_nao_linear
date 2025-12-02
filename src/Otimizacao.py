@@ -25,6 +25,21 @@ class Otimizacao:
             self.fit()
             tempos.append(time.time() - inicio)
         return sum(tempos) / n
+    
+    
+    def _proj_simplex(self, v):
+        """
+        Algoritmo de projeção no simplexo.
+        Fornecido pelo usuário.
+        """
+        n = len(v)
+        u = np.sort(v)[::-1]
+        cssv = np.cumsum(u)
+        rho = np.nonzero(u * np.arange(1, n+1) > (cssv - 1))[0][-1]
+        theta = (cssv[rho] - 1.0) / (rho + 1)
+        w = np.maximum(v - theta, 0)
+        return w
+
 
     def gerar_grad_hess(self):
         mu = sp.Matrix(self.mu)

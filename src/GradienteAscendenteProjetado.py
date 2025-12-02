@@ -16,7 +16,6 @@ class GradienteAscendenteProjetado(Otimizacao):
     def fit(self, x0=None, alpha_0=None, rho=0.5, c=1e-4, max_iter=5000, 
             tol=1e-6, clip_min=0.01, clip_max=0.99, verbose=False):
         
-        
         start = time.time()
         n = self.n
         
@@ -66,14 +65,7 @@ class GradienteAscendenteProjetado(Otimizacao):
 
             # 6. PROJEÇÃO (CRÍTICO: Clip + Normalização)
             # Traz o ponto de volta para o espaço viável
-            x_next = np.clip(x_next, clip_min, clip_max)
-            soma = np.sum(x_next)
-            
-            if soma > 1e-9:
-                x_next /= soma
-            else:
-                # Degenerou para zero, reinicia uniforme
-                x_next = np.ones(n) / n
+            x_next = self._proj_simplex(x_next)
             
             # Verificação de convergência por variação no x (opcional, mas recomendada para projetado)
             if np.linalg.norm(x_next - x_k) < tol:

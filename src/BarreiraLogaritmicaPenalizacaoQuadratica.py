@@ -67,6 +67,8 @@ class BarreiraLogaritmicaPenalizacaoQuadratica(Otimizacao):
 
         if x0 is None:
             w0 = np.ones(n) / n # adiciona pesos uniformes
+        else: 
+            w0 = np.array(x0, dtype=float)
         
         # cria o lagrangiano   
         lam0 = 0.0
@@ -127,162 +129,162 @@ class BarreiraLogaritmicaPenalizacaoQuadratica(Otimizacao):
         }
 
 
-class LagrangianoAumentadoPHR(Otimizacao):
-    """
-    Versão revisada: Lagrangiano Aumentado (PHR) + Barreira logarítmica.
-    Correções:
-      - força sum(w)=1 como restrição do solver interno (SLSQP)
-      - bounds w_i >= eps para compatibilidade com log
-      - atualização de rho condicional (quando violação não melhora)
-      - cálculo correto de gradientes compatível com jac passado ao solver
-    """
+# class LagrangianoAumentadoPHR(Otimizacao):
+#     """
+#     Versão revisada: Lagrangiano Aumentado (PHR) + Barreira logarítmica.
+#     Correções:
+#       - força sum(w)=1 como restrição do solver interno (SLSQP)
+#       - bounds w_i >= eps para compatibilidade com log
+#       - atualização de rho condicional (quando violação não melhora)
+#       - cálculo correto de gradientes compatível com jac passado ao solver
+#     """
 
-    def __init__(self, mu: np.ndarray, cov: np.ndarray, r_f: float):
-        super().__init__(mu, cov, r_f)
-        self.gerar_grad_hess()   # cria _sharpe_sym, _grad_sym, _hess_sym
-        self.lam = 0.0
-        self.mu_i = np.zeros(self.n)
-        self.rho = 1.0
+#     def __init__(self, mu: np.ndarray, cov: np.ndarray, r_f: float):
+#         super().__init__(mu, cov, r_f)
+#         self.gerar_grad_hess()   # cria _sharpe_sym, _grad_sym, _hess_sym
+#         self.lam = 0.0
+#         self.mu_i = np.zeros(self.n)
+#         self.rho = 1.0
 
-    def _Lagrangiano_PHR_val_grad(self, w, t):
-        n = self.n
-        eps = 1e-12
-        w = np.asarray(w, dtype=float).reshape(-1)
-        w_stable = np.maximum(w, eps)
+#     def _Lagrangiano_PHR_val_grad(self, w, t):
+#         n = self.n
+#         eps = 1e-12
+#         w = np.asarray(w, dtype=float).reshape(-1)
+#         w_stable = np.maximum(w, eps)
 
-        f = float(self._sharpe_sym(w_stable))
+#         f = float(self._sharpe_sym(w_stable))
 
-        # igualdade e desigualdades
-        h = np.sum(w_stable) - 1.0               # h(w)
-        g = -w_stable                            # g_i(w) = -w_i <= 0
+#         # igualdade e desigualdades
+#         h = np.sum(w_stable) - 1.0               # h(w)
+#         g = -w_stable                            # g_i(w) = -w_i <= 0
 
-        # PHR terms
-        L_eq = 0.5 * self.rho * (h + self.lam / self.rho) ** 2
+#         # PHR terms
+#         L_eq = 0.5 * self.rho * (h + self.lam / self.rho) ** 2
 
-        g_shift = g + self.mu_i / self.rho      # vetor
-        g_plus = np.maximum(0.0, g_shift)
-        L_ineq = 0.5 * self.rho * np.sum(g_plus ** 2)
+#         g_shift = g + self.mu_i / self.rho      # vetor
+#         g_plus = np.maximum(0.0, g_shift)
+#         L_ineq = 0.5 * self.rho * np.sum(g_plus ** 2)
 
-        L_total = f + L_eq + L_ineq 
+#         L_total = f + L_eq + L_ineq 
 
-        # Gradientes
-        grad_f = np.asarray(self._grad_sym(w_stable), dtype=float).reshape(-1)   # df/dw
+#         # Gradientes
+#         grad_f = np.asarray(self._grad_sym(w_stable), dtype=float).reshape(-1)   # df/dw
 
-        grad_L_eq = (h + self.lam / self.rho) * np.ones(n)
+#         grad_L_eq = (h + self.lam / self.rho) * np.ones(n)
 
-        mask = (g_shift > 0.0).astype(float)
-        grad_L_ineq = - self.rho * g_plus * mask
+#         mask = (g_shift > 0.0).astype(float)
+#         grad_L_ineq = - self.rho * g_plus * mask
 
-        grad_total = grad_f + grad_L_eq + grad_L_ineq 
+#         grad_total = grad_f + grad_L_eq + grad_L_ineq 
 
-        return float(L_total), grad_total
+#         return float(L_total), grad_total
 
-    def _solve_subproblem(self, w0, t, eps):
-        """
-        Resolve o subproblema com BFGS, impondo sum(w)=1 e bounds w_i >= eps.
-        Retorna w_opt e o objeto result do scipy.
-        """
-        n = self.n
+#     def _solve_subproblem(self, w0, t, eps):
+#         """
+#         Resolve o subproblema com BFGS, impondo sum(w)=1 e bounds w_i >= eps.
+#         Retorna w_opt e o objeto result do scipy.
+#         """
+#         n = self.n
 
-        fun = lambda ww: self._Lagrangiano_PHR_val_grad(ww, t)[0]
-        jac = lambda ww: self._Lagrangiano_PHR_val_grad(ww, t)[1]
+#         fun = lambda ww: self._Lagrangiano_PHR_val_grad(ww, t)[0]
+#         jac = lambda ww: self._Lagrangiano_PHR_val_grad(ww, t)[1]
 
-        res = minimize(fun=fun,
-                       x0=w0,
-                       jac=jac,
-                       method='BFGS',
-                       options={'maxiter': 1000, 'ftol': 1e-8, 'disp': False})
-        return res.x, res
+#         res = minimize(fun=fun,
+#                        x0=w0,
+#                        jac=jac,
+#                        method='BFGS',
+#                        options={'maxiter': 1000, 'ftol': 1e-8, 'disp': False})
+#         return res.x, res
 
-    def fit(self,
-            x0=None,
-            t_init=1.0,
-            t_factor=2.0,
-            t_max=1e6,
-            max_outer=100,
-            tol=1e-8,
-            eps=1e-8,
-            rho_increase_factor=10.0,
-            verbose=False):
+#     def fit(self,
+#             x0=None,
+#             t_init=1.0,
+#             t_factor=2.0,
+#             t_max=1e6,
+#             max_outer=100,
+#             tol=1e-8,
+#             eps=1e-8,
+#             rho_increase_factor=10.0,
+#             verbose=False):
 
-        start = time.time()
-        n = self.n
+#         start = time.time()
+#         n = self.n
 
-        if x0 is None:
-            w = np.ones(n) / n
-        else:
-            w = np.asarray(x0, dtype=float).reshape(-1)
+#         if x0 is None:
+#             w = np.ones(n) / n
+#         else:
+#             w = np.asarray(x0, dtype=float).reshape(-1)
 
-        t = t_init
-        history = []
-        nit_total = 0
+#         t = t_init
+#         history = []
+#         nit_total = 0
 
-        prev_primal_viol = np.inf
+#         prev_primal_viol = np.inf
 
-        for k in range(max_outer):
-            history.append(w.copy())
+#         for k in range(max_outer):
+#             history.append(w.copy())
 
-            # resolve subproblema (agora com equality constraint explicitamente)
-            w_opt, res = self._solve_subproblem(w, t, eps)
-            nit_total += getattr(res, 'nit', 0)
-            w = w_opt.copy()
+#             # resolve subproblema (agora com equality constraint explicitamente)
+#             w_opt, res = self._solve_subproblem(w, t, eps)
+#             nit_total += getattr(res, 'nit', 0)
+#             w = w_opt.copy()
 
-            # avalia violações
-            h = np.sum(w) - 1.0
-            g = np.maximum(0.0, -w)   # violações das desigualdades (se w<0)
-            primal_viol = max(abs(h), np.max(g))
+#             # avalia violações
+#             h = np.sum(w) - 1.0
+#             g = np.maximum(0.0, -w)   # violações das desigualdades (se w<0)
+#             primal_viol = max(abs(h), np.max(g))
 
-            if verbose:
-                pos_sharpe = -float(self._sharpe_sym(w))    # sharpe positivo
-                print(f"[outer {k}] sharpe={pos_sharpe:.6f} primal_viol={primal_viol:.3e} rho={self.rho:.3e}")
+#             if verbose:
+#                 pos_sharpe = -float(self._sharpe_sym(w))    # sharpe positivo
+#                 print(f"[outer {k}] sharpe={pos_sharpe:.6f} primal_viol={primal_viol:.3e} rho={self.rho:.3e}")
 
-            # atualiza multiplicadores
-            self.lam = self.lam + self.rho * h
-            self.mu_i = np.maximum(0.0, self.mu_i + self.rho * (-w))   # mu <- max(0, mu + rho*g) with g=-w
+#             # atualiza multiplicadores
+#             self.lam = self.lam + self.rho * h
+#             self.mu_i = np.maximum(0.0, self.mu_i + self.rho * (-w))   # mu <- max(0, mu + rho*g) with g=-w
 
-            # critério de parada (primal viol pequeno e KKT approx)
-            if primal_viol <= tol:
-                # opcional: verificar gradiente Lagrangiano pequeno (cond KKT)
-                grad_L = self._Lagrangiano_PHR_val_grad(w, t)[1]
-                # proj grad em subspace tangente (simple check)
-                if np.linalg.norm(grad_L) <= 1e-6:
-                    if verbose:
-                        print("Convergiu (primal viol e grad baixos).")
-                    break
+#             # critério de parada (primal viol pequeno e KKT approx)
+#             if primal_viol <= tol:
+#                 # opcional: verificar gradiente Lagrangiano pequeno (cond KKT)
+#                 grad_L = self._Lagrangiano_PHR_val_grad(w, t)[1]
+#                 # proj grad em subspace tangente (simple check)
+#                 if np.linalg.norm(grad_L) <= 1e-6:
+#                     if verbose:
+#                         print("Convergiu (primal viol e grad baixos).")
+#                     break
 
-            # controle de aumento de rho: só aumenta se violação não melhorou o suficiente
-            if prev_primal_viol != np.inf:
-                if primal_viol > 0.5 * prev_primal_viol:
-                    # não melhorou o suficiente -> aumenta rho
-                    self.rho *= rho_increase_factor
-                    if verbose:
-                        print(f"Aumentando rho -> {self.rho:.3e}")
+#             # controle de aumento de rho: só aumenta se violação não melhorou o suficiente
+#             if prev_primal_viol != np.inf:
+#                 if primal_viol > 0.5 * prev_primal_viol:
+#                     # não melhorou o suficiente -> aumenta rho
+#                     self.rho *= rho_increase_factor
+#                     if verbose:
+#                         print(f"Aumentando rho -> {self.rho:.3e}")
 
-            prev_primal_viol = primal_viol
+#             prev_primal_viol = primal_viol
 
-            # aumenta o parâmetro de barrier t (t controla 1/t na barrier)
-            t *= t_factor
-            if t > t_max:
-                if verbose:
-                    print("t atingiu t_max -> parando.")
-                break
+#             # aumenta o parâmetro de barrier t (t controla 1/t na barrier)
+#             t *= t_factor
+#             if t > t_max:
+#                 if verbose:
+#                     print("t atingiu t_max -> parando.")
+#                 break
 
-        end = time.time()
-        self.w = w.copy()
-        pos_sharpe = -float(self._sharpe_sym(w))
-        cost_final = float(self._Lagrangiano_PHR_val_grad(w, t)[0])
+#         end = time.time()
+#         self.w = w.copy()
+#         pos_sharpe = -float(self._sharpe_sym(w))
+#         cost_final = float(self._Lagrangiano_PHR_val_grad(w, t)[0])
 
-        return {
-            "method": "PHR-Barrier-revised",
-            "w": self.w,
-            "lambda": float(self.lam),
-            "mu": self.mu_i.copy(),
-            "rho": self.rho,
-            "sharpe": pos_sharpe,
-            "cost_final": cost_final,
-            "success": res.success,
-            "status": res.status,
-            "time": end - start,
-            "nit_total": nit_total,
-            "history": history,
-        }
+#         return {
+#             "method": "PHR-Barrier-revised",
+#             "w": self.w,
+#             "lambda": float(self.lam),
+#             "mu": self.mu_i.copy(),
+#             "rho": self.rho,
+#             "sharpe": pos_sharpe,
+#             "cost_final": cost_final,
+#             "success": res.success,
+#             "status": res.status,
+#             "time": end - start,
+#             "nit_total": nit_total,
+#             "history": history,
+#         }
