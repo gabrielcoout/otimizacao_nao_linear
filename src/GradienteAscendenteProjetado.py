@@ -63,11 +63,10 @@ class GradienteAscendenteProjetado(Otimizacao):
             # Passo de Atualização
             x_next = x_k + alpha_k * p_k
 
-            # 6. PROJEÇÃO (CRÍTICO: Clip + Normalização)
             # Traz o ponto de volta para o espaço viável
             x_next = self._proj_simplex(x_next)
             
-            # Verificação de convergência por variação no x (opcional, mas recomendada para projetado)
+            # Verificação de convergência por variação no x 
             if np.linalg.norm(x_next - x_k) < tol:
                 x_k = x_next
                 break

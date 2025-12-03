@@ -21,9 +21,6 @@ def Info():
     tabela_info = pd.DataFrame({'Tickers': ibv_50, "Ações": nome_ibv_50})
     st.dataframe(tabela_info, hide_index = True)
     st.markdown("""
-## Resumo do Relatório – Otimização Não Linear de Portfólios
-
----
 
 ### Visão Geral
 Este painel interativo aplica métodos de otimização não linear para construir carteiras eficientes de ações da B3 com base na Teoria Moderna do Portfólio.  
@@ -45,18 +42,16 @@ Para n ativos escolhidos:
 - **Taxa livre de risco:** rf  
 - **Pesos:** w
 
-O retorno da carteira é  
+O retorno da carteira é:
 **R(w) = µᵀ w**
 
-e o risco (volatilidade):
+A volatilidade é:
+**σ(w) = √(wᵀ Σ w)**
 
-**σ(w) = sqrt(wᵀ Σ w)**.
+O índice de Sharpe é:
+**S(w) = (µᵀ w – rf) / √(wᵀ Σ w)**
 
-A métrica de desempenho utilizada é o **Índice de Sharpe**:
-
-**S(w) = (µᵀ w – rf) / sqrt(wᵀ Σ w)**.
-
-O problema é formulado como:
+O problema final é:
 
 - minimizar –S(w)  
 - sujeito a 1ᵀ w = 1 e w ≥ 0  
@@ -65,63 +60,141 @@ A região viável é um **simplexo**, onde os pesos são não-negativos e somam 
 
 ---
 
-### Métodos de Otimização Implementados
-
-#### 1. Maximização do Índice de Sharpe (Método Híbrido)
-O método é dividido em duas etapas:
-
-**(a) Solução Analítica (irrestrita)**  
-Calcula-se o portfólio tangente fechado e verifica-se se os pesos pertencem ao intervalo [0,1].  
-Se a solução for viável, ela é aceita.
-
-**(b) Solução Numérica (Gradiente Ascendente)**  
-Caso contrário, aplica-se um algoritmo iterativo com:
-- atualização w ← w + η ∇S  
-- projeção dos pesos no simplexo (clipping + normalização)  
-- critério de parada pelo módulo da variação do Sharpe
-
-Esse método se mostrou eficiente e estável.
+## Métodos de Otimização Implementados
 
 ---
 
-#### 2. Método de Barreiras Logarítmicas com Penalidade Quadrática
-A restrição wi ≥ 0 é tratada com a barreira:
+### 1. Maximização do Índice de Sharpe (Método Híbrido)
 
-**ϕ(w) = −∑ log(wi)**
+O método foi dividido em duas etapas:
 
-e a soma 1ᵀ w = 1 é incorporada como penalidade:
+#### (a) Solução Analítica (Irrestrita)
+Calcula-se o portfólio tangente:
 
-**(t/2)(1ᵀ w − 1)²**
+**w\* = Σ⁻¹(µ − rf·1) / (1ᵀ Σ⁻¹ (µ−rf·1))**
 
-O parâmetro t cresce iterativamente seguindo uma estratégia de caminho central, e cada subproblema é resolvido por BFGS.
+Se w\* satisfaz **w ≥ 0** e **1ᵀw = 1**, a solução é aceita.
 
-Apesar de correto teoricamente, o método apresentou **instabilidade numérica** quando alguns pesos se aproximaram de zero.
+#### (b) Solução Numérica: Gradiente Ascendente Projetado
+Caso contrário:
 
----
+- direção via ∇S(w);  
+- backtracking com Armijo;  
+- projeção no simplexo via algoritmo O(n log n);  
+- convergência quando |ΔSharpe| < 10⁻⁸.
 
-#### 3. Método de Restrições Ativas
-Método alternativo no qual identificam-se pesos que ficam nulos na solução (restrições ativas).  
-Resolve-se então o problema reduzido somente nas variáveis livres.  
-Adequado quando a solução ótima apresenta muitos pesos zerados.
-
----
-
-### Resultados Numéricos
-- O método de barreiras tornou-se numericamente frágil devido à explosão do gradiente e da Hessiana próximos de **wᵢ → 0**.  
-- O método híbrido (solução analítica + gradiente projetado) apresentou o melhor comportamento geral.  
-- As carteiras obtidas são consistentes com a teoria de Markowitz e respeitam integralmente as restrições práticas do investidor.
+Este método mostrou-se eficiente e extremamente estável.
 
 ---
 
-### Organização do Código
-O projeto é modular e dividido em:
+### 2. Método de Barreiras Logarítmicas com Penalidade Quadrática
 
-- coleta e pré-processamento de dados  
-- cálculo de métricas financeiras  
-- métodos de otimização  
-- interface Streamlit (página principal, informações e visualizações)
+As restrições são tratadas com:
 
-Essa estrutura facilita manutenção, testes e expansão do painel.
+- barreira para wi > 0:  
+  **φ(w) = − Σ log(wi)**
+- penalidade quadrática para 1ᵀw = 1:  
+  **(t/2)(1ᵀ w − 1)²**
+
+Cada subproblema é resolvido por **BFGS**, com t aumentando iterativamente (caminho central).
+
+Apesar da fundamentação sólida, o método apresentou:
+
+- instabilidade numérica em dimensões maiores;
+- gradiente e Hessiana mal-condicionados perto de wi → 0.
 
 ---
-""")
+
+### 3. Método do Gradiente Espectral Projetado (SPG)
+
+Combina:
+
+- projeção no simplexo (sempre viável),
+- direção espectral de Barzilai–Borwein,
+- busca linear com backtracking.
+
+Define:
+
+- sk = wk − wk−1  
+- yk = ∇f(wk) − ∇f(wk−1)  
+- passo espectral:  
+  **λk = (sᵀs)/(sᵀy)**  
+- direção:  
+  **dk = P(wk − λk∇f(wk)) − wk**
+
+Este método teve o melhor desempenho geral, especialmente em dimensões maiores.
+
+---
+
+### Observações
+
+- SPG foi **o método mais eficiente** e com o melhor compromisso entre precisão e tempo.
+- O método de barreiras se degradou rapidamente conforme n aumentou.
+- O gradiente projetado é robusto, porém mais lento em n=25.
+- SPG converge com cerca de **metade das iterações** do gradiente projetado.
+
+---
+
+## Conclusão
+
+Os experimentos mostraram que:
+
+- Métodos baseados em barreiras têm forte fundamentação teórica, mas sofrem com:
+  - instabilidade numérica,
+  - sensibilidade a hiperparâmetros,
+  - custo computacional elevado.
+
+Por outro lado:
+
+- Métodos baseados em projeção se mostraram **dominantes** para o problema:
+  - garantem viabilidade estrita,
+  - não exigem parâmetros artificiais,
+  - são mais estáveis.
+
+Entre eles, o **Método SPG** apresentou o melhor desempenho:
+
+- passos longos e eficientes,
+- comportamento de segunda ordem sem calcular a Hessiana,
+- custo computacional baixo,
+- excelente estabilidade.
+
+**Conclusão geral:** SPG é a abordagem recomendada para otimização de portfólios com restrições práticas na B3.
+
+## Referências
+
+[1] ASSAF NETO, Alexandre. *Mercado Financeiro*. 9. ed. São Paulo: Atlas, 2008.
+
+[2] CHOEY, Mark; WEIGEND, Andreas S. *Nonlinear Trading Models Through Sharpe Ratio Maximization*.  
+Leonard N. Stern School of Business, New York University, 1996.
+
+[3] DUCHI, J.; SHALEV-SHWARTZ, S.; SINGER, Y.; CHANDRA, T.  
+*Efficient Projections onto the L1-Ball for Learning in High Dimensions*.  
+In: Proceedings of the 25th International Conference on Machine Learning (ICML). ACM, 2008.  
+Disponível em: https://dl.acm.org/doi/10.1145/1390156.1390191.  
+Acesso em: 02 dez. 2025.
+
+[4] ELTON, Edwin J.; GRUBER, Martin J.; BROWN, Stephen; GOETZMANN, William.  
+*Moderna teoria de carteira e análise de investimentos*. São Paulo: Elsevier, 2012.
+
+[5] MARKOWITZ, Harry. *Portfolio Selection*. The Journal of Finance, 1952.
+
+[6] MEURER, Aaron; SMITH, Christopher P.; PAPAGHEORGHIOS, Mateusz; et al.  
+*SymPy: symbolic computing in Python*. PeerJ Computer Science, v. 3, n. e103, 2017.
+
+[7] NOCEDAL, Jorge; WRIGHT, Stephen J. *Numerical Optimization*.  
+2. ed. New York: Springer, 2006.
+
+[8] QUANTPEDIA. *Markowitz Model*.  
+Disponível em: https://quantpedia.com/markowitz-model/#:~:text=Tangency%20portfolio%2C%20the%20red%20point.  
+Acesso em: 30 nov. 2025.
+
+[9] THE SCIPY COMMUNITY. *scipy.optimize.minimize*. SciPy v1.11.4 Reference Guide.  
+Disponível em: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html.  
+Acesso em: 02 dez. 2025.
+
+[10] WIKIPEDIA. *Simplex*.  
+Disponível em: https://en.wikipedia.org/wiki/Simplex.  
+Acesso em: 30 nov. 2025.
+
+"""
+)

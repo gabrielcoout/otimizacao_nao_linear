@@ -81,8 +81,7 @@ class GradienteEspectralProjetado(Otimizacao):
                     lambda_val = sts / sty
                     lambda_k = min(lambda_max, max(lambda_min, lambda_val))
 
-            # --- Direção de Busca pk ---
-            # pk = P_Omega(xk - lambda_k * grad(xk)) - xk
+            # Direção de Busca pk 
             w_k = x_k - lambda_k * g_k
             x_trial = self._proj_simplex(w_k)
             p_k = x_trial - x_k # Direção de descida viável

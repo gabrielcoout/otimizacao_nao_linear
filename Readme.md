@@ -29,7 +29,22 @@ Otimizacao/ → métodos de otimização de portfólio
 
 Visualizacoes/ → gráficos e plots
 
+src/Methods/ -> backtracking, gradientedescendente, metodo de newton
+
 data/ → cache de dados e metadados
+
+analises/ -> programas python que executam as analises contidas no relatório
+
+
+
+# Metodos em src/
+
+Classe Abstrata:   src/Otimizacao
+Classes Concretas: src/GradienteAscendenteProjetado
+                   src/GradienteEspectralProjetado
+                   src/BarreiraLogaritmicaPenalizacaoQuadratica
+                   src/Analitico
+
 
 # Objetivo
 O projeto facilita a montagem de portfólios otimizados com base em métricas de risco e retorno, permitindo comparar diferentes métodos de otimização não linear e visualizar resultados de forma clara e interativa.

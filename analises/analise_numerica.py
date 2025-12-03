@@ -219,6 +219,6 @@ def tabela_analise(metricas, r_f, verbose=True):
     return tabelas
 
 if __name__ == "__main__":
-    res = tabela_analise(metricas, r_f)
+    res = tabela_analise(metricas, r_f=0.05)
     df_final = pd.concat(res.values(), ignore_index=True)
     df_final.to_csv('resultados.csv', index=False)
