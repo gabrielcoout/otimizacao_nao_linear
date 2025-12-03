@@ -14,7 +14,7 @@ class GradienteAscendenteProjetado(Otimizacao):
         self.gerar_grad_hess()
 
     def fit(self, x0=None, alpha_0=None, rho=0.5, c=1e-4, max_iter=5000, 
-            tol=1e-6, clip_min=0.01, clip_max=0.99, verbose=False):
+            tol=1e-6, verbose=False):
         
         start = time.time()
         n = self.n
