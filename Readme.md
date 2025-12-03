@@ -40,10 +40,15 @@ analises/ -> programas python que executam as analises contidas no relatório
 # Metodos em src/
 
 Classe Abstrata:   src/Otimizacao
+
 Classes Concretas: src/GradienteAscendenteProjetado
+
                    src/GradienteEspectralProjetado
+
                    src/BarreiraLogaritmicaPenalizacaoQuadratica
+
                    src/Analitico
+                   
 
 
 # Objetivo
